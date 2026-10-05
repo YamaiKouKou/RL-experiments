@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from multiprocessing import Pool
 
+os.chdir('src')
+
 from agent.base_agent import BaseAgent
 from algorithm.qpsp import QPSPAlgorithm
 
