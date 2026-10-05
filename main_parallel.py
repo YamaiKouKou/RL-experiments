@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from multiprocessing import Pool
 
+cur_dir = os.getcwd()
+print(cur_dir)
 os.chdir('src')
 
 from agent.base_agent import BaseAgent
