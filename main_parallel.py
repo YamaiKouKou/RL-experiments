@@ -5,9 +5,8 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from multiprocessing import Pool
 
-cur_dir = os.getcwd()
-print(cur_dir)
-os.chdir('src')
+cur_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(cur_dir, 'src'))
 
 from agent.base_agent import BaseAgent
 from algorithm.qpsp import QPSPAlgorithm
