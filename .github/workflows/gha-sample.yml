@@ -23,4 +23,10 @@ jobs:
           pip install -r requirements.txt
       - name: Run Python
         run: python main_parallel.py
-        
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with: 
+          name: experiment-results
+          path: |
+            *.png
+            *.txt
