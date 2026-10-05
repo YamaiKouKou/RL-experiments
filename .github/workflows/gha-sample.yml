@@ -1,1 +1,25 @@
+name: Action Sample
 
+on: 
+  push:
+    branches:
+      - master
+  workflow_dispatch: 
+
+jobs:
+  rl-experiment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+      - name: Get Python version
+        run: python -V
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+      - name: Run Python
+        run: python main_parallel.py
+        
