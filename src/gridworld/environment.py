@@ -187,6 +187,6 @@ class Environment:
                 self.agents_cargo[agent_id] = False
                 reward = 1.0
                 delivered = True
-                #self.agents_pos[agent_id] = self.random_spawn(agent_id)
+                self.agents_pos[agent_id] = self.random_spawn(agent_id)
                 break
         return reward,delivered,movable
