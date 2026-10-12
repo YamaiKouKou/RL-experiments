@@ -209,11 +209,11 @@ class Environment:
             if self.layout[ny][nx] == 3 and not cargo:
                 self.agents_cargo[agent_id] = True
                 break
-            #搬出口にいて、かつ荷物所持
+            #搬出口にいて、かつ荷物所持(エピソード終了)
             elif self.layout[ny][nx] == 4 and cargo:
                 self.agents_cargo[agent_id] = False
                 reward = 1.0
                 delivered = True
-                #self.agents_pos[agent_id] = self.random_spawn(agent_id)
+                self.agents_pos[agent_id] = self.random_spawn(agent_id)
                 break
         return reward,delivered,movable
