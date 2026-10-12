@@ -21,7 +21,10 @@ PAST_N = 2
 MAX_STEPS = 5_000_000
 BLOCK = 1000
 #SEEDS = [0]
-SEEDS = [0,1,2,3,4,5,6,7,8,9]
+#SEEDS = [0,1,2,3,4,5,6,7,8,9]
+First_seed = 0
+Last_seed = 9
+SEEDS = list(range(First_seed, Last_seed+1))
 
 IsMomentum = True
 Lambda = 0.9
@@ -72,7 +75,7 @@ if __name__ == '__main__':
 
     task_args = [(seed, OUTF) for seed in SEEDS]
     
-    with Pool(processes=10) as pool:
+    with Pool(processes=2) as pool:
         results = pool.map(run_simulation, task_args)
 
     print("\n計算完了。グラフ一括プロットします。")
