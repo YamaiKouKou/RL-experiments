@@ -1,13 +1,9 @@
 import os
-import sys
 import random
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 import pickle
-
-cur_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(cur_dir, 'src'))
 
 from agent.base_agent import BaseAgent
 from algorithm.qpsp import QPSPAlgorithm
