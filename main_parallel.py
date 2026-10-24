@@ -26,7 +26,7 @@ First_seed = 0
 Last_seed = 9
 SEEDS = list(range(First_seed, Last_seed+1))
 
-IsMomentum = False
+IsMomentum = True
 Lambda = 1
 
 if IsMomentum is True:
