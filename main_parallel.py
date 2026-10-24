@@ -11,23 +11,23 @@ from algorithm.qpsp import QPSPAlgorithm
 from logfunc.callback import LoggerCallback
 
 ENV_NUM = 3
-AGENT_NUM = 1
+AGENT_NUM = 5
 ALPHA = 0.06
 GAMMA = 0.95
 D_RATE = 0.20
 TEMPERATURE = 0.52
 PAST_N = 2
 #PAST_N = None
-MAX_STEPS = 1_000_000
+MAX_STEPS = 5_000_000
 BLOCK = 1000
 #SEEDS = [0]
 #SEEDS = [0,1,2,3,4,5,6,7,8,9]
 First_seed = 0
-Last_seed = 9
+Last_seed = 19
 SEEDS = list(range(First_seed, Last_seed+1))
 
 IsMomentum = True
-Lambda = 1
+Lambda = 0.9
 
 if IsMomentum is True:
     from gridworld.environment_momentum import Environment
