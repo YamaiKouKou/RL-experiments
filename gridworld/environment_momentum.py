@@ -127,9 +127,11 @@ class Environment:
         if self.past_n is None:
             return (0,0)
 
-        else:
-            v = self.agents_relative_vector[agent_id]
-            return (round(float(v[0]),6), round(float(v[1]),6))
+        if len(self.agents_actqueue[agent_id]) < self.past_n:
+            return (0,0)
+        
+        v = self.agents_relative_vector[agent_id]
+        return (round(float(v[0]),6), round(float(v[1]),6))
         
     #重み付き相対ベクトルをアップデートする関数
     def update_relvec(self, agent_id, movable, action):
