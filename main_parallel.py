@@ -75,7 +75,7 @@ if __name__ == '__main__':
 
     task_args = [(seed, OUTF) for seed in SEEDS]
     
-    with Pool(processes=2) as pool:
+    with Pool(processes=4) as pool:
         results = pool.map(run_simulation, task_args)
 
     print("\n計算完了。グラフ一括プロットします。")
