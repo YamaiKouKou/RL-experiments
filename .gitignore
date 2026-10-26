@@ -1,1 +1,4 @@
-
+result/
+*.npz
+*.pkl.gz
+__pycache__/
