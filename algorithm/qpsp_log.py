@@ -26,6 +26,14 @@ import numpy as np
 from algorithm.qpsp import QPSPAlgorithm
 
 
+def _open_w(path):
+    """末尾が .gz なら gzip で圧縮して書く（中身は同じ pickle。gzip.open で読めば元どおり）。"""
+    if str(path).endswith(".gz"):
+        import gzip
+        return gzip.open(path, "wb")
+    return open(path, "wb")
+
+
 class QPSPLogAlgorithm(QPSPAlgorithm):
     def __init__(self, alpha=0.1, gamma=0.9, d_rate=0.2,
                  save_episodes=True, ckpt_every=None, traj_windows=None, ckpt_path=None):
@@ -33,7 +41,7 @@ class QPSPLogAlgorithm(QPSPAlgorithm):
         self.save_episodes = save_episodes
         self.ckpt_every = ckpt_every
         # ckpt_path を渡すと、チェックポイントのたびにその場で pickle に書き出す（メモリに溜めない）
-        # 例: "out/tag_seed=0_qtable_step={step}.pkl"
+        # 例: "out/tag_seed=0_qtable_step={step}.pkl.gz"（末尾が .gz なら gzip で圧縮して保存）
         self.ckpt_path = ckpt_path
         # 例: [(0, 20000), (2_490_000, 2_510_000), (4_980_000, 5_000_000)]  終端は含まない
         self.traj_windows = sorted(traj_windows) if traj_windows else []
@@ -168,7 +176,7 @@ class QPSPLogAlgorithm(QPSPAlgorithm):
     def _checkpoint(self, step, agents):
         if self.ckpt_path:
             import pickle
-            with open(self.ckpt_path.format(step=step), "wb") as f:
+            with _open_w(self.ckpt_path.format(step=step)) as f:
                 pickle.dump([a.q_table for a in agents], f, protocol=pickle.HIGHEST_PROTOCOL)
         else:
             self.ckpts[step] = [copy.deepcopy(a.q_table) for a in agents]
@@ -204,5 +212,5 @@ class QPSPLogAlgorithm(QPSPAlgorithm):
         np.savez_compressed(path_npz, **arrays)
         if path_ckpt and self.ckpts:
             import pickle
-            with open(path_ckpt, "wb") as f:
+            with _open_w(path_ckpt) as f:
                 pickle.dump(self.ckpts, f, protocol=pickle.HIGHEST_PROTOCOL)
