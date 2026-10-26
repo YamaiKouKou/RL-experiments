@@ -1,0 +1,72 @@
+# .github/workflows/run_experiment.yml
+# GitHub の Actions タブ → 「Run experiment」→「Run workflow」で、画面から設定を入れて実行する。
+name: Run experiment
+
+on:
+  workflow_dispatch:
+    inputs:
+      methods:
+        description: '手法（複数可, カンマ区切り）: obs / prior / prop'
+        default: 'obs,prior,prop'
+      seeds:
+        description: 'シード（例: 0-29 / 0-9,20）'
+        default: '0-29'
+      lam:
+        description: 'λ（prop のときだけ使う）'
+        default: '0.9'
+      past_n:
+        description: 'N'
+        default: '2'
+      agents:
+        description: 'エージェント数'
+        default: '5'
+      max_steps:
+        description: '総ステップ数'
+        default: '5000000'
+      ckpt_every:
+        description: 'Qテーブルを保存する間隔（0 で最後だけ）'
+        default: '2000000'
+      traj_seeds:
+        description: '序盤・中盤・終盤の動きとQ値を記録するシード（none で無し）'
+        default: '0-2'
+
+jobs:
+  # 手法のリストを matrix 用の JSON に変換
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      methods: ${{ steps.m.outputs.methods }}
+    steps:
+      - id: m
+        run: echo "methods=$(echo '${{ inputs.methods }}' | python3 -c 'import sys,json; print(json.dumps([x.strip() for x in sys.stdin.read().split(",") if x.strip()]))')" >> "$GITHUB_OUTPUT"
+
+  run:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 360          # 1ジョブの上限は6時間
+    strategy:
+      fail-fast: false
+      matrix:
+        method: ${{ fromJSON(needs.setup.outputs.methods) }}   # 手法ごとに別ジョブで同時に走る
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy matplotlib openpyxl
+      - name: 実行
+        run: >
+          python main_parallel.py
+          --method ${{ matrix.method }}
+          --seeds '${{ inputs.seeds }}'
+          --lam ${{ inputs.lam }}
+          --past_n ${{ inputs.past_n }}
+          --agents ${{ inputs.agents }}
+          --max_steps ${{ inputs.max_steps }}
+          --ckpt_every ${{ inputs.ckpt_every }}
+          --traj_seeds '${{ inputs.traj_seeds }}'
+          --out result
+      - uses: actions/upload-artifact@v4
+        with:
+          name: result-${{ matrix.method }}-lam${{ inputs.lam }}-seeds${{ inputs.seeds }}
+          path: result/
