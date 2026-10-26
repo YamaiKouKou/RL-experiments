@@ -1,3 +1,0 @@
-python plot_compare.py --obs result/20261011-2212/env=3_agent=5_N=None_relative.txt --prior result/20261011-2144/env=3_agent=5_N=2_relative.txt --prop result/20261005-2316/env=3_agent=5_N=2_acthistory.txt --max_step 5000000 --out compare.png
-
-python plot_compare.py --obs result/20261011-2212/env=3_agent=5_N=None_relative.txt --prior result/20261011-2144/env=3_agent=5_N=2_relative.txt --prop result/20261005-2316/env=3_agent=5_N=2_acthistory.txt --max_step 3000000 --out compare-3M.png
