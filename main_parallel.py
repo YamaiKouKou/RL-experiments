@@ -6,7 +6,7 @@
   python main_parallel.py --method prop  --lam 0.9 --seeds 0-9,20,21
   python main_parallel.py --method prop  --lam 1.0 --agents 1 --max_steps 1000000
 
-記録・保存（既定: 200万ステップごとに Q テーブルを pickle、シード0〜2 の序盤・中盤・終盤を Excel）
+記録・保存（既定: 200万ステップごとに Q テーブルを pickle.gz、シード0〜2 の序盤・中盤・終盤を Excel）
   --ckpt_every 2000000    : Q テーブルを pickle で保存する間隔（0 で保存しない。最後は常に保存）
   --traj_seeds 0-2        : 序盤・中盤・終盤の動きと Q 値を記録するシード（none で記録しない）
   --traj_len 2000         : 各区間のステップ数
@@ -120,7 +120,7 @@ def run_simulation(job):
     algo = QPSPLogAlgorithm(alpha=cfg["alpha"], gamma=cfg["gamma"], d_rate=cfg["d_rate"],
                             save_episodes=True,
                             ckpt_every=cfg["ckpt_every"] or None,
-                            ckpt_path=base + "_qtable_step={step}.pkl",
+                            ckpt_path=base + "_qtable_step={step}.pkl.gz",
                             traj_windows=windows)
     callback = LoggerCallback(log_file_path, cfg["agents"], cfg["past_n"])
     callback.on_debug_log = lambda *args, **kw: None   # テキストのデバッグログは書かない
