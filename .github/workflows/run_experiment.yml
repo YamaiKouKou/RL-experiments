@@ -22,7 +22,7 @@ on:
         default: '5'
       max_steps:
         description: '総ステップ数'
-        default: '5000000'
+        default: '10000000'
       ckpt_every:
         description: 'Qテーブルを保存する間隔（0 で最後だけ）'
         default: '2000000'
