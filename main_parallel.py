@@ -12,6 +12,13 @@
   --traj_len 2000         : 各区間のステップ数
   --no_excel              : 区間の記録を Excel にしない（npz だけ）
 
+停止などの解析用（traj_seeds のシードだけに効く）
+  --traj_full 800000      : 0〜800000 ステップの全ステップの動きと Q 値を記録（Excel には出さない）
+  --upd_until 800000      : 搬出ステップが 800000 未満の Q 更新を 1 回ずつ全部記録（_updates.npz）
+  例: python main_parallel.py --method prop --agents 3 --seeds 0 --traj_seeds 0 \
+          --traj_full 800000 --upd_until 800000 --max_steps 800000
+      → analyze_updates.py ..._updates.npz で解析
+
 --method で手法を選ぶ:
   obs   : 観測のみ           (PAST_N=None, environment.py)
   prior : 先行研究(相対ベクトル) (environment.py)
@@ -68,6 +75,10 @@ def get_args():
     ap.add_argument("--traj_seeds", type=parse_seeds, default=parse_seeds("0-2"), help="動きを記録するシード（none で無し）")
     ap.add_argument("--traj_len", type=int, default=2000, help="序盤・中盤・終盤それぞれのステップ数")
     ap.add_argument("--no_excel", action="store_true", help="区間の記録を Excel に書き出さない")
+    ap.add_argument("--traj_full", type=int, default=0,
+                    help="0以外なら traj_seeds のシードを 0〜このステップまで全部記録（npzのみ、Excelには出さない）")
+    ap.add_argument("--upd_until", type=int, default=0,
+                    help="0以外なら traj_seeds のシードについて、搬出ステップがこれ未満の Q 更新を全部記録（_updates.npz）")
     ap.add_argument("--out", default="./result")
     a = ap.parse_args()
     if a.method == "obs":
@@ -113,15 +124,23 @@ def run_simulation(job):
     # 序盤・中盤・終盤の区間（このシードを記録する場合だけ）
     T, L = cfg["max_steps"], cfg["traj_len"]
     windows = None
-    if seed in cfg["traj_seeds"] and L > 0:
+    if seed in cfg["traj_seeds"] and cfg["traj_full"] > 0:
+        windows = [(0, min(cfg["traj_full"], T))]                  # 最初から全ステップ
+    elif seed in cfg["traj_seeds"] and L > 0:
         windows = [(0, L), (T // 2 - L // 2, T // 2 + (L - L // 2)), (T - L, T)]
 
+    # Q 更新の記録をとるシードは、記録つきのクラスを使う（学習の中身は同じ）
+    algo_cls, extra = QPSPLogAlgorithm, {}
+    if seed in cfg["traj_seeds"] and cfg["upd_until"] > 0:
+        from algorithm.qpsp_updlog import QPSPUpdLogAlgorithm
+        algo_cls, extra = QPSPUpdLogAlgorithm, {"upd_until": cfg["upd_until"]}
+
     agents = [BaseAgent() for _ in range(cfg["agents"])]
-    algo = QPSPLogAlgorithm(alpha=cfg["alpha"], gamma=cfg["gamma"], d_rate=cfg["d_rate"],
-                            save_episodes=True,
-                            ckpt_every=cfg["ckpt_every"] or None,
-                            ckpt_path=base + "_qtable_step={step}.pkl.gz",
-                            traj_windows=windows)
+    algo = algo_cls(alpha=cfg["alpha"], gamma=cfg["gamma"], d_rate=cfg["d_rate"],
+                    save_episodes=True,
+                    ckpt_every=cfg["ckpt_every"] or None,
+                    ckpt_path=base + "_qtable_step={step}.pkl.gz",
+                    traj_windows=windows, **extra)
     callback = LoggerCallback(log_file_path, cfg["agents"], cfg["past_n"])
     callback.on_debug_log = lambda *args, **kw: None   # テキストのデバッグログは書かない
 
@@ -131,12 +150,12 @@ def run_simulation(job):
     # 最後の Q テーブル（途中保存と重なっていなければ）
     if not (cfg["ckpt_every"] and T % cfg["ckpt_every"] == 0):
         algo._checkpoint(T, agents)
-    # ブロック・エピソード・区間の記録（npz）
+    # ブロック・エピソード・区間の記録（npz）。Q 更新を記録したシードは _updates.npz も出る
     algo.save(base + "_log.npz",
               meta=dict(seed=seed, method=cfg["method"], lam=cfg["lam"] if cfg["method"] == "prop" else 1.0,
                         N=cfg["past_n"] if cfg["past_n"] else 0, git=cfg["git"]))
     # 区間の記録を Excel に
-    if windows and not cfg["no_excel"]:
+    if windows and not cfg["no_excel"] and not cfg["traj_full"]:
         from logfunc.excel_writer import write_traj_excel
         write_traj_excel(base + "_traj.xlsx", algo.traj, labels=["序盤", "中盤", "終盤"])
     print(f"seed={seed} done", flush=True)
