@@ -1,10 +1,15 @@
 # .github/workflows/run_experiment.yml
 # GitHub の Actions タブ → 「Run experiment」→「Run workflow」で、画面から設定を入れて実行する。
 name: Run experiment
+# 一覧に表示される名前（#31 のような番号の横に、何の実験かが出る）
+run-name: "${{ inputs.methods }} | N=${{ inputs.past_n }} λ=${{ inputs.lam }} | ${{ inputs.agents }}体 | seeds=${{ inputs.seeds }} | ${{ inputs.max_steps }}step ${{ inputs.memo }}"
 
 on:
   workflow_dispatch:
     inputs:
+      memo:
+        description: 'メモ（一覧の名前に入る。空でもよい）'
+        default: ''
       methods:
         description: '手法（複数可, カンマ区切り）: obs / prior / prop'
         default: 'obs,prior,prop'
@@ -27,8 +32,11 @@ on:
         description: 'Qテーブルを保存する間隔（0 で最後だけ）'
         default: '2000000'
       traj_seeds:
-        description: '序盤・中盤・終盤の動きとQ値を記録するシード（none で無し）'
+        description: '動きとQ値を記録するシード（none で無し）'
         default: '0-2'
+      analysis_until:
+        description: '解析用: traj_seeds のシードについて、0〜このステップの全ての動きとQ更新を記録（0 で無し）'
+        default: '0'
 
 jobs:
   # 手法のリストを matrix 用の JSON に変換
@@ -42,6 +50,7 @@ jobs:
 
   run:
     needs: setup
+    name: "${{ matrix.method }} N=${{ inputs.past_n }} λ=${{ inputs.lam }} ${{ inputs.agents }}体 seeds=${{ inputs.seeds }}"
     runs-on: ubuntu-latest
     timeout-minutes: 360          # 1ジョブの上限は6時間
     strategy:
@@ -55,6 +64,7 @@ jobs:
           python-version: '3.11'
       - run: pip install numpy matplotlib openpyxl
       - name: 実行
+        timeout-minutes: 350      # 6時間で強制終了される前に止めて、下のアップロードを走らせる
         run: >
           python main_parallel.py
           --method ${{ matrix.method }}
@@ -65,8 +75,11 @@ jobs:
           --max_steps ${{ inputs.max_steps }}
           --ckpt_every ${{ inputs.ckpt_every }}
           --traj_seeds '${{ inputs.traj_seeds }}'
+          --traj_full ${{ inputs.analysis_until }}
+          --upd_until ${{ inputs.analysis_until }}
           --out result
       - uses: actions/upload-artifact@v4
+        if: always()              # 途中で止まっても、そこまでの結果をアップロードする
         with:
-          name: result-${{ matrix.method }}-lam${{ inputs.lam }}-seeds${{ inputs.seeds }}
+          name: result-${{ matrix.method }}-N${{ inputs.past_n }}-lam${{ inputs.lam }}-agents${{ inputs.agents }}-seeds${{ inputs.seeds }}
           path: result/
