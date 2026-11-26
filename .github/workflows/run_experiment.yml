@@ -14,7 +14,7 @@ on:
         description: '手法（複数可, カンマ区切り）: obs / prior / prop'
         default: 'obs,prior,prop'
       seeds:
-        description: 'シード（例: 0-29 / 0-9,20）'
+        description: 'シード（例: 0-29 / 0-9,20）。/ で区切るとジョブが分かれる（例: 0-9/10-19/20-29）'
         default: '0-29'
       lam:
         description: 'λ（prop のときだけ使う）'
@@ -39,36 +39,40 @@ on:
         default: '0'
 
 jobs:
-  # 手法のリストを matrix 用の JSON に変換
+  # 手法とシードの組を matrix 用の JSON に変換（シードは / で区切るとジョブが分かれる）
   setup:
     runs-on: ubuntu-latest
     outputs:
       methods: ${{ steps.m.outputs.methods }}
+      seeds: ${{ steps.m.outputs.seeds }}
     steps:
       - id: m
-        run: echo "methods=$(echo '${{ inputs.methods }}' | python3 -c 'import sys,json; print(json.dumps([x.strip() for x in sys.stdin.read().split(",") if x.strip()]))')" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "methods=$(echo '${{ inputs.methods }}' | python3 -c 'import sys,json; print(json.dumps([x.strip() for x in sys.stdin.read().split(",") if x.strip()]))')" >> "$GITHUB_OUTPUT"
+          echo "seeds=$(echo '${{ inputs.seeds }}' | python3 -c 'import sys,json; print(json.dumps([x.strip() for x in sys.stdin.read().split("/") if x.strip()]))')" >> "$GITHUB_OUTPUT"
 
   run:
     needs: setup
-    name: "${{ matrix.method }} N=${{ inputs.past_n }} λ=${{ inputs.lam }} ${{ inputs.agents }}体 seeds=${{ inputs.seeds }}"
+    name: "${{ matrix.method }} N=${{ inputs.past_n }} λ=${{ inputs.lam }} ${{ inputs.agents }}体 seeds=${{ matrix.seeds }}"
     runs-on: ubuntu-latest
     timeout-minutes: 360          # 1ジョブの上限は6時間
     strategy:
       fail-fast: false
       matrix:
         method: ${{ fromJSON(needs.setup.outputs.methods) }}   # 手法ごとに別ジョブで同時に走る
+        seeds: ${{ fromJSON(needs.setup.outputs.seeds) }}       # シードのまとまりごとにも別ジョブ
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install numpy matplotlib openpyxl
+      - run: pip install numpy matplotlib openpyxl pandas
       - name: 実行
-        timeout-minutes: 350      # 6時間で強制終了される前に止めて、下のアップロードを走らせる
+        timeout-minutes: 330      # 6時間で強制終了される前に止めて、下のアップロードを走らせる
         run: >
           python main_parallel.py
           --method ${{ matrix.method }}
-          --seeds '${{ inputs.seeds }}'
+          --seeds '${{ matrix.seeds }}'
           --lam ${{ inputs.lam }}
           --past_n ${{ inputs.past_n }}
           --agents ${{ inputs.agents }}
@@ -78,8 +82,16 @@ jobs:
           --traj_full ${{ inputs.analysis_until }}
           --upd_until ${{ inputs.analysis_until }}
           --out result
+      - name: 解析して大きな記録を消す（analysis_until を使ったときだけ）
+        if: always() && inputs.analysis_until != '0'
+        run: |
+          python where_split.py result/* --start 150000 --end ${{ inputs.analysis_until }} --out "result/where_${{ matrix.method }}_seeds${{ matrix.seeds }}" || true
+          python spread_check.py result/* --start 150000 --end ${{ inputs.analysis_until }} --out "result/spread_${{ matrix.method }}_seeds${{ matrix.seeds }}" || true
+          # 記録ファイルは大きく artifact の容量を超えるので、集計（CSV）を作ったら消す
+          find result -name "*_updates.npz" -delete
+          find result -name "*_log.npz" -delete
       - uses: actions/upload-artifact@v4
         if: always()              # 途中で止まっても、そこまでの結果をアップロードする
         with:
-          name: result-${{ matrix.method }}-N${{ inputs.past_n }}-lam${{ inputs.lam }}-agents${{ inputs.agents }}-seeds${{ inputs.seeds }}
+          name: result-${{ matrix.method }}-N${{ inputs.past_n }}-lam${{ inputs.lam }}-agents${{ inputs.agents }}-seeds${{ matrix.seeds }}
           path: result/
