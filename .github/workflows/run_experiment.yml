@@ -11,7 +11,7 @@ on:
         description: 'メモ（一覧の名前に入る。空でもよい）'
         default: ''
       methods:
-        description: '手法（複数可, カンマ区切り）: obs / prior / prop'
+        description: '手法（複数可, カンマ区切り）: obs / prior / prop。prop:A / prop:B で一部の場所だけ区別をなくす（run_localmerge.py）'
         default: 'obs,prior,prop'
       seeds:
         description: 'シード（例: 0-29 / 0-9,20）。/ で区切るとジョブが分かれる（例: 0-9/10-19/20-29）'
@@ -69,29 +69,37 @@ jobs:
       - run: pip install numpy matplotlib openpyxl pandas
       - name: 実行
         timeout-minutes: 330      # 6時間で強制終了される前に止めて、下のアップロードを走らせる
-        run: >
-          python main_parallel.py
-          --method ${{ matrix.method }}
-          --seeds '${{ matrix.seeds }}'
-          --lam ${{ inputs.lam }}
-          --past_n ${{ inputs.past_n }}
-          --agents ${{ inputs.agents }}
-          --max_steps ${{ inputs.max_steps }}
-          --ckpt_every ${{ inputs.ckpt_every }}
-          --traj_seeds '${{ inputs.traj_seeds }}'
-          --traj_full ${{ inputs.analysis_until }}
-          --upd_until ${{ inputs.analysis_until }}
-          --out result
+        run: |
+          M="${{ matrix.method }}"
+          if [[ "$M" == *:* ]]; then
+            METHOD="${M%%:*}"; SCRIPT="run_localmerge.py --merge ${M#*:}"; TAGM="${METHOD}-merge${M#*:}"
+          else
+            METHOD="$M"; SCRIPT="main_parallel.py"; TAGM="$M"
+          fi
+          echo "ART_NAME=result-${TAGM}-N${{ inputs.past_n }}-lam${{ inputs.lam }}-agents${{ inputs.agents }}-seeds${{ matrix.seeds }}" >> "$GITHUB_ENV"
+          echo "TAGM=${TAGM}" >> "$GITHUB_ENV"
+          python $SCRIPT \
+            --method "$METHOD" \
+            --seeds '${{ matrix.seeds }}' \
+            --lam ${{ inputs.lam }} \
+            --past_n ${{ inputs.past_n }} \
+            --agents ${{ inputs.agents }} \
+            --max_steps ${{ inputs.max_steps }} \
+            --ckpt_every ${{ inputs.ckpt_every }} \
+            --traj_seeds '${{ inputs.traj_seeds }}' \
+            --traj_full ${{ inputs.analysis_until }} \
+            --upd_until ${{ inputs.analysis_until }} \
+            --out result
       - name: 解析して大きな記録を消す（analysis_until を使ったときだけ）
         if: always() && inputs.analysis_until != '0'
         run: |
-          python where_split.py result/* --start 150000 --end ${{ inputs.analysis_until }} --out "result/where_${{ matrix.method }}_seeds${{ matrix.seeds }}" || true
-          python spread_check.py result/* --start 150000 --end ${{ inputs.analysis_until }} --out "result/spread_${{ matrix.method }}_seeds${{ matrix.seeds }}" || true
+          python where_split.py result/* --start 150000 --end ${{ inputs.analysis_until }} --out "result/where_${TAGM}_seeds${{ matrix.seeds }}" || true
+          python spread_check.py result/* --start 150000 --end ${{ inputs.analysis_until }} --out "result/spread_${TAGM}_seeds${{ matrix.seeds }}" || true
           # 記録ファイルは大きく artifact の容量を超えるので、集計（CSV）を作ったら消す
           find result -name "*_updates.npz" -delete
           find result -name "*_log.npz" -delete
       - uses: actions/upload-artifact@v4
         if: always()              # 途中で止まっても、そこまでの結果をアップロードする
         with:
-          name: result-${{ matrix.method }}-N${{ inputs.past_n }}-lam${{ inputs.lam }}-agents${{ inputs.agents }}-seeds${{ matrix.seeds }}
+          name: ${{ env.ART_NAME || format('result-failed-seeds{0}', matrix.seeds) }}
           path: result/
