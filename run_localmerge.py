@@ -6,8 +6,10 @@ gridworld.environment_momentum.Environment.get_relvec を外から差し替え�
 区別をなくした状態には印（3 つ目の要素 1）を付けて、他の場所の状態と Q 値の行が混ざらないようにしている。
 
 場所の指定（--merge）
-  A : 荷物あり・搬入口から出口  (4,6) (3,6) (3,5) (3,4)            … 区別が一番効いていると見られた場所
-  B : 荷物なし・下の通路と合流部 (4,3) (4,4) (4,5) (3,3) (2,3)      … 比較用（訪問の割合が A と同じくらい）
+  A  : 荷物あり・搬入口から出口  (4,6) (3,6) (3,5) (3,4)
+  B  : 荷物なし・下の通路と合流部 (4,3) (4,4) (4,5) (3,3) (2,3)
+  AB : A と B の両方
+  C  : A と B 以外の全部（荷物あり/なし、全マス）
   自分で決めるとき: --merge "4,6;3,6:1"  （マスを ; 区切り、: のあとに荷物 0/1。荷物を省くと両方）
 
 使い方（main_parallel.py と同じフォルダに置く。--merge 以外の引数は main_parallel.py と同じ。--method prop で使う）
@@ -24,9 +26,23 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gridworld import environment_momentum as EM     # noqa: E402
 
-PRESET = {
-    "A": ({(4, 6), (3, 6), (3, 5), (3, 4)}, {1}),
-    "B": ({(4, 3), (4, 4), (4, 5), (3, 3), (2, 3)}, {0}),
+A_CELLS = {(4, 6), (3, 6), (3, 5), (3, 4)}          # 荷物あり
+B_CELLS = {(4, 3), (4, 4), (4, 5), (3, 3), (2, 3)}  # 荷物なし
+
+
+def _in_a(pos, cargo):
+    return cargo == 1 and pos in A_CELLS
+
+
+def _in_b(pos, cargo):
+    return cargo == 0 and pos in B_CELLS
+
+
+PRESET = {                                          # (位置, 荷物) → 区別をなくすか
+    "A": _in_a,
+    "B": _in_b,
+    "AB": lambda p, c: _in_a(p, c) or _in_b(p, c),
+    "C": lambda p, c: not (_in_a(p, c) or _in_b(p, c)),
 }
 DY = [-1, 1, 0, 0, 0]
 DX = [0, 0, -1, 1, 0]
@@ -38,10 +54,10 @@ def parse_merge(s):
     cells_part, _, cargo_part = s.partition(":")
     cells = {tuple(int(v) for v in c.split(",")) for c in cells_part.split(";") if c.strip()}
     cargo = {int(cargo_part)} if cargo_part.strip() else {0, 1}
-    return (cells, cargo), "X"
+    return (lambda p, c: p in cells and c in cargo), "X"
 
 
-def install(cells, cargos):
+def install(rule):
     orig = EM.Environment.get_relvec
 
     def get_relvec_merge(self, agent_id):
@@ -49,7 +65,7 @@ def install(cells, cargos):
         if self.past_n is None:
             return v
         pos = tuple(int(x) for x in self.agents_pos[agent_id])
-        if pos in cells and int(bool(self.agents_cargo[agent_id])) in cargos:
+        if rule(pos, int(bool(self.agents_cargo[agent_id]))):
             q = self.agents_actqueue[agent_id]
             if len(q) < self.past_n:                   # 3手たまっていないときは元と同じく (0,0)
                 return (0.0, 0.0, 1)
@@ -66,9 +82,9 @@ def main():
     i = argv.index("--merge")
     spec = argv[i + 1]
     del argv[i:i + 2]
-    (cells, cargos), name = parse_merge(spec)
-    install(cells, cargos)
-    print(f"区別をなくす場所: {sorted(cells)}  荷物: {sorted(cargos)}")
+    rule, name = parse_merge(spec)
+    install(rule)
+    print(f"区別をなくす場所: {spec}")
     here = os.path.dirname(os.path.abspath(__file__))
     if argv and argv[0] == "--eval":
         sys.argv = argv[1:]

@@ -89,7 +89,7 @@ def label(path):
     m = "本手法" if "acthistory" in n else ("観測のみ" if re.search(r"N=?None", n) else "先行研究")
     if "randtag" in n:
         m += "+ランダム番号"
-    mm = re.search(r"_merge(\w)", n)
+    mm = re.search(r"_merge([A-Z]+)", n)
     if mm:
         m += f"（{mm.group(1)}で区別なし）"
     s = re.search(r"seed=?(\d+)", n)
